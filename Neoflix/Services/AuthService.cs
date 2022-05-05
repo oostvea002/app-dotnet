@@ -101,29 +101,42 @@ namespace Neoflix.Services
         /// The task result contains an authorized user or null when the user is not found or password is incorrect.
         /// </returns>
         // tag::authenticate[]
-        public Task<Dictionary<string, object>> AuthenticateAsync(string email, string plainPassword)
+        public async Task<Dictionary<string, object>> AuthenticateAsync(string email, string plainPassword)
         {
-            if (email == "graphacademy@neo4j.com" && plainPassword == "letmein")
+            await using var session = _driver.AsyncSession();
+            var user = await session.ReadTransactionAsync(async tx =>
             {
-                var exampleUser = new Dictionary<string, object>
+
+                // tag::query[]
+                var cursor = await tx.RunAsync("MATCH (u: User {email: $email}) RETURN u", new { email });
+                // end::query[]
+
+                // tag::norecords[]
+                if (!await cursor.FetchAsync())
                 {
-                    ["identity"] = 1,
-                    ["properties"] = new Dictionary<string, object>
-                    {
-                        ["userId"] = 1,
-                        ["email"] = "graphacademy@neo4j.com",
-                        ["name"] = "Graph Academy"
-                    }
-                };
+                    // no records
+                    return null;
+                }    
+                // end::norecords[]
 
-                var safeProperties = SafeProperties(exampleUser["properties"] as Dictionary<string, object>);
+                var record = cursor.Current;
+                var userProperties = record["u"].As<INode>().Properties;
+                return userProperties.ToDictionary(x => x.Key, x => x.Value);
+            });
 
-                safeProperties.Add("token", JwtHelper.CreateToken(GetUserClaims(safeProperties)));
+            if (user == null)
+                return null;
 
-                return Task.FromResult(safeProperties);
-            }
+            // tag::password[]
+            if (!BCryptNet.Verify(plainPassword, user["password"].As<string>()))
+                return null;
+            // end::password[]
 
-            return Task.FromResult<Dictionary<string,object>>(null);
+            // tag::return[]
+            var safeProperties = SafeProperties(user);
+            safeProperties.Add("token", JwtHelper.CreateToken(GetUserClaims(safeProperties)));
+            return safeProperties;    
+            // end::return[]
         }
         // end::authenticate[]
 
