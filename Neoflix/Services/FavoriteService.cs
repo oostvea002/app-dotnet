@@ -75,7 +75,7 @@ namespace Neoflix.Services
         public async Task<Dictionary<string, object>> AddAsync(string userId, string movieId)
         {
             await using var session = _driver.AsyncSession();
-            
+
             // Create HAS_FAVORITE relationship within a Write Transaction
             return await session.WriteTransactionAsync(async tx =>
             {
@@ -83,22 +83,23 @@ namespace Neoflix.Services
                 var query = @"
                     MATCH (u:User {userId: $userId})
                     MATCH (m:Movie {tmdbId: $movieId})
-                    
+
                     MERGE (u)-[r:HAS_FAVORITE]->(m)
                     ON CREATE SET u.createdAt = datetime()
-                    
+
                     RETURN m {
                         .*,
                         favorite: true
                     } AS movie";
                 var cursor = await tx.RunAsync(query, new { userId, movieId });
                 // end::create[]
+
+                // tag::throw[]
                 if (!await cursor.FetchAsync())
                 {
-                    // tag::throw[]
                     throw new NotFoundException($"Couldn't create a favorite relationship for User {userId} and Movie {movieId}");
-                    // end::throw[]
                 }
+                // end::throw[]
 
                 // tag::return[]
                 return cursor.Current["movie"].As<Dictionary<string, object>>();
