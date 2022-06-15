@@ -42,7 +42,6 @@ namespace Neoflix.Services
         {
             // Open a new session.
             await using var session = _driver.AsyncSession();
-<<<<<<< HEAD
 
             // Execute a query in a new Read Transaction.
             return await session.ReadTransactionAsync(async tx =>
@@ -54,19 +53,6 @@ namespace Neoflix.Services
                 var cursor = await tx.RunAsync(@$"
                     MATCH (m:Movie)
                     WHERE m.{sort} IS NOT NULL
-=======
-
-            // Execute a query in a new Read Transaction.
-            return await session.ReadTransactionAsync(async tx =>
-            {
-                // Get an array of IDs for the User's favorite movies
-                var favorites = await GetUserFavoritesAsync(tx, userId);
-
-                // tag::allcypher[]
-                var cursor = await tx.RunAsync(@$"
-                    MATCH (m:Movie)
-                    WHERE m.{sort} IS NOT NULL
->>>>>>> 95cdc7105417e9f83e67414a1daa354c0107e024
                     RETURN m {{
                         .*,
                         favorite: m.tmdbId IN $favorites
@@ -80,11 +66,7 @@ namespace Neoflix.Services
                 var records = await cursor.ToListAsync();
                 var movies = records
                     .Select(x => x["movie"].As<Dictionary<string, object>>())
-<<<<<<< HEAD
                     .ToArray();
-=======
-                    .ToArray();
->>>>>>> 95cdc7105417e9f83e67414a1daa354c0107e024
                 // end::allmovies[]
 
                 // tag::return[]
@@ -119,7 +101,6 @@ namespace Neoflix.Services
             var records = await session.ReadTransactionAsync(async tx =>
             {
                 var favorites = await GetUserFavoritesAsync(tx, userId);
-<<<<<<< HEAD
 
                 var query = $@"
                     MATCH (m:Movie)-[:IN_GENRE]->(:Genre {{name: $name}})
@@ -135,23 +116,6 @@ namespace Neoflix.Services
                 return await cursor.ToListAsync();
             });
 
-=======
-
-                var query = $@"
-                    MATCH (m:Movie)-[:IN_GENRE]->(:Genre {{name: $name}})
-                    WHERE m.{sort} IS NOT NULL
-                    RETURN m {{
-                        .*,
-                        favorite: m.tmdbId IN $favorites
-                    }} AS movie
-                    ORDER BY m.{sort} {order.ToString("G").ToUpper()}
-                    SKIP $skip
-                    LIMIT $limit";
-                var cursor = await tx.RunAsync(query, new {skip, limit, favorites, name});
-                return await cursor.ToListAsync();
-            });
-
->>>>>>> 95cdc7105417e9f83e67414a1daa354c0107e024
             return records
                 .Select(x => x["movie"].As<Dictionary<string, object>>())
                 .ToArray();
@@ -179,7 +143,6 @@ namespace Neoflix.Services
             Ordering order = Ordering.Asc, int limit = 6, int skip = 0, string userId = null)
         {
             await using var session = _driver.AsyncSession();
-<<<<<<< HEAD
 
             var records = await session.ReadTransactionAsync(async tx =>
             {
@@ -199,27 +162,6 @@ namespace Neoflix.Services
                 return await cursor.ToListAsync();
             });
 
-=======
-
-            var records = await session.ReadTransactionAsync(async tx =>
-            {
-                var favorites = await GetUserFavoritesAsync(tx, userId);
-
-                var query = $@"
-                    MATCH (:Person {{tmdbId: $id}})-[:ACTED_IN]->(m:Movie)
-                    WHERE m.{sort} IS NOT NULL
-                    RETURN m {{
-                        .*,
-                        favorite: m.tmdbId IN $favorites
-                    }} AS movie
-                    ORDER BY m.{sort} {order.ToString("G").ToUpper()}
-                    SKIP $skip
-                    LIMIT $limit";
-                var cursor = await tx.RunAsync(query, new { skip, limit, favorites, id });
-                return await cursor.ToListAsync();
-            });
-
->>>>>>> 95cdc7105417e9f83e67414a1daa354c0107e024
             return records
                 .Select(x => x["movie"].As<Dictionary<string, object>>())
                 .ToArray();
@@ -293,11 +235,7 @@ namespace Neoflix.Services
             {
                 var favorites = await GetUserFavoritesAsync(tx, userId);
 
-<<<<<<< HEAD
                 var query = @"
-=======
-                var query = @"
->>>>>>> 95cdc7105417e9f83e67414a1daa354c0107e024
                     MATCH (m:Movie {tmdbId: $id})
                     RETURN m {
                         .*,actors: [ (a)-[r:ACTED_IN]->(m) | a { .*, role: r.role } ],
@@ -342,11 +280,7 @@ namespace Neoflix.Services
             {
                 var favorites = await GetUserFavoritesAsync(tx, userId);
 
-<<<<<<< HEAD
                 var query = @"
-=======
-                var query = @"
->>>>>>> 95cdc7105417e9f83e67414a1daa354c0107e024
                     MATCH (:Movie {tmdbId: $id})-[:IN_GENRE|ACTED_IN|DIRECTED]->()<-[:IN_GENRE|ACTED_IN|DIRECTED]-(m)
                     WHERE exists(m.imdbRating)
                     WITH m, count(*) AS inCommon
