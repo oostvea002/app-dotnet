@@ -37,12 +37,12 @@ namespace Neoflix.Services
         /// The task result contains a list of records.
         /// </returns>
         // tag::all[]
-        public async Task<Dictionary<string, object>[]> AllAsync(string sort = "title", 
+        public async Task<Dictionary<string, object>[]> AllAsync(string sort = "title",
             Ordering order = Ordering.Asc, int limit = 6, int skip = 0, string userId = null)
         {
             // Open a new session.
             await using var session = _driver.AsyncSession();
-      
+
             // Execute a query in a new Read Transaction.
             return await session.ReadTransactionAsync(async tx =>
             {
@@ -52,7 +52,7 @@ namespace Neoflix.Services
                 // tag::allcypher[]
                 var cursor = await tx.RunAsync(@$"
                     MATCH (m:Movie)
-                    WHERE m.{sort} IS NOT NULL       
+                    WHERE m.{sort} IS NOT NULL
                     RETURN m {{
                         .*,
                         favorite: m.tmdbId IN $favorites
@@ -66,7 +66,7 @@ namespace Neoflix.Services
                 var records = await cursor.ToListAsync();
                 var movies = records
                     .Select(x => x["movie"].As<Dictionary<string, object>>())
-                    .ToArray();   
+                    .ToArray();
                 // end::allmovies[]
 
                 // tag::return[]
@@ -148,7 +148,7 @@ namespace Neoflix.Services
             {
                 var favorites = await GetUserFavoritesAsync(tx, userId);
 
-                var query = $@"        
+                var query = $@"
                     MATCH (:Person {{tmdbId: $id}})-[:ACTED_IN]->(m:Movie)
                     WHERE m.{sort} IS NOT NULL
                     RETURN m {{
@@ -194,7 +194,7 @@ namespace Neoflix.Services
             {
                 var favorites = await GetUserFavoritesAsync(tx, userId);
 
-                var query = $@"        
+                var query = $@"
                     MATCH (:Person {{tmdbId: $id}})-[:DIRECTED]->(m:Movie)
                     WHERE m.{sort} IS NOT NULL
                     RETURN m {{
@@ -235,7 +235,7 @@ namespace Neoflix.Services
             {
                 var favorites = await GetUserFavoritesAsync(tx, userId);
 
-                var query = @"        
+                var query = @"
                     MATCH (m:Movie {tmdbId: $id})
                     RETURN m {
                         .*,actors: [ (a)-[r:ACTED_IN]->(m) | a { .*, role: r.role } ],
@@ -256,7 +256,7 @@ namespace Neoflix.Services
 
             return records.First()["movie"].As<Dictionary<string, object>>();
         }
-        // end:findById[]
+        // end::findById[]
 
         /// <summary>
         /// Get a paginated list of similar movies to the Movie with the <see cref="id"/> supplied.<br/>
@@ -280,7 +280,7 @@ namespace Neoflix.Services
             {
                 var favorites = await GetUserFavoritesAsync(tx, userId);
 
-                var query = @"        
+                var query = @"
                     MATCH (:Movie {tmdbId: $id})-[:IN_GENRE|ACTED_IN|DIRECTED]->()<-[:IN_GENRE|ACTED_IN|DIRECTED]-(m)
                     WHERE exists(m.imdbRating)
                     WITH m, count(*) AS inCommon
