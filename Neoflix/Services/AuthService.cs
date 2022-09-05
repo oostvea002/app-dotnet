@@ -39,29 +39,39 @@ namespace Neoflix.Services
         public async Task<Dictionary<string, object>> RegisterAsync(string email, string plainPassword, string name)
         {
             var rounds = Config.UnpackPasswordConfig();
+
             var encrypted = BCryptNet.HashPassword(plainPassword, rounds);
+
             // tag::constraintError[]
-            // TODO: Handle Unique constraints in the database
-            if (email != "graphacademy@neo4j.com")
-                throw new ValidationException($"An account already exists with the email address", email);
-            // end::constraintError[]
-            
-            // TODO: Save user
-            var exampleUser = new Dictionary<string, object>
+            try
             {
-                ["identity"] = 1,
-                ["properties"] = new Dictionary<string, object>
+                await using var session = _driver.AsyncSession();
+
+                var user = await session.WriteTransactionAsync(async tx =>
                 {
-                    ["userId"] = 1,
-                    ["email"] = "graphacademy@neo4j.com",
-                    ["name"] = "Graph Academy"
-                }
-            };
+                    var query = @"
+                        CREATE (u:User {
+                            userId: randomUuid(),
+                            email: $email,
+                            password: $encrypted,
+                            name: $name
+                        })
+                        RETURN u { .userId, .name, .email } as u";
+                    var cursor = await tx.RunAsync(query, new {email, encrypted, name});
+                    var record = await cursor.SingleAsync();
 
-            var safeProperties = SafeProperties(exampleUser["properties"] as Dictionary<string, object>);
-            safeProperties.Add("token", JwtHelper.CreateToken(GetUserClaims(safeProperties)));
+                    return record["u"].As<Dictionary<string, object>>();
+                });
 
-            return safeProperties;
+                var safeProperties = SafeProperties(user);
+                safeProperties.Add("token", JwtHelper.CreateToken(GetUserClaims(safeProperties)));
+                return safeProperties;
+            }
+            catch (ClientException ex) when (ex.Code == "Neo.ClientError.Schema.ConstraintValidationFailed")
+            {
+                throw new ValidationException(ex.Message, email);
+            }
+            // end::constraintError[]  
         }
         // end::register[]
 
@@ -85,29 +95,28 @@ namespace Neoflix.Services
         /// The task result contains an authorized user or null when the user is not found or password is incorrect.
         /// </returns>
         // tag::authenticate[]
-        public Task<Dictionary<string, object>> AuthenticateAsync(string email, string plainPassword)
+        public async Task<Dictionary<string, object>> AuthenticateAsync(string email, string plainPassword)
         {
-            if (email == "graphacademy@neo4j.com" && plainPassword == "letmein")
+            await using var session = _driver.AsyncSession();
+
+            var user = await session.ReadTransactionAsync(async tx => 
             {
-                var exampleUser = new Dictionary<string, object>
-                {
-                    ["identity"] = 1,
-                    ["properties"] = new Dictionary<string, object>
-                    {
-                        ["userId"] = 1,
-                        ["email"] = "graphacademy@neo4j.com",
-                        ["name"] = "Graph Academy"
-                    }
-                };
+                var cursor = await tx.RunAsync("MATCH (u:User {email: $email}) RETURN u", new {email});
 
-                var safeProperties = SafeProperties(exampleUser["properties"] as Dictionary<string, object>);
+                if (!await cursor.FetchAsync()) return null;
 
-                safeProperties.Add("token", JwtHelper.CreateToken(GetUserClaims(safeProperties)));
+                var record = cursor.Current;
+                var userProperties = record["u"].As<INode>().Properties;
+                return userProperties.ToDictionary(x => x.Key, x => x.Value);
+            });
 
-                return Task.FromResult(safeProperties);
-            }
+            if (user == null) return null;
+            if (!BCryptNet.Verify(plainPassword, user["password"].As<string>())) return null;
 
-            return Task.FromResult<Dictionary<string,object>>(null);
+            var safeProperties = SafeProperties(user);
+            safeProperties.Add("token", JwtHelper.CreateToken(GetUserClaims(safeProperties)));
+            return safeProperties; 
+
         }
         // end::authenticate[]
 
